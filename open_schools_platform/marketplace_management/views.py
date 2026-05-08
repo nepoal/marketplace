@@ -41,6 +41,7 @@ from open_schools_platform.marketplace_management.serializers import (
     ReviewSerializer,
     CreateReviewSerializer,
     InstallationSerializer,
+    PaymentSerializer,
     AppLaunchResponseSerializer,
     OidcTokenResponseSerializer,
     OidcUserInfoSerializer,
@@ -57,6 +58,7 @@ from open_schools_platform.marketplace_management.services import (
     create_app_launch,
     build_launch_url,
     initiate_oidc_auth,
+    create_payment,
 )
 
 TAGS = [SwaggerTags.MARKETPLACE_MANAGEMENT]
@@ -224,6 +226,24 @@ class AppReviewCreateUpdateApi(ApiAuthMixin, APIView):
         return Response(status=204)
 
 
+class AppPayApi(ApiAuthMixin, APIView):
+    @swagger_auto_schema(
+        operation_description=(
+            "Pay for a paid app. Price is taken from the app record at the time of payment."
+        ),
+        tags=TAGS,
+        responses={
+            201: PaymentSerializer(),
+            400: "App is free or payment already exists",
+            404: "Not found",
+        },
+    )
+    def post(self, request, app_id):
+        app = get_app(filters={"id": str(app_id)}, empty_exception=True)
+        payment = create_payment(app=app, user=request.user)
+        return Response(PaymentSerializer(payment).data, status=201)
+
+
 class AppLaunchApi(ApiAuthMixin, APIView):
     @swagger_auto_schema(
         operation_description=(
@@ -370,7 +390,7 @@ class OidcUserInfoApi(APIView):
                 "Authorization header must be 'Bearer <access_token>'."
             )
 
-        token_value = auth_header[len("Bearer ") :]
+        token_value = auth_header[len("Bearer "):]
         access_token = get_access_token(filters={"token": token_value})
 
         if not access_token:

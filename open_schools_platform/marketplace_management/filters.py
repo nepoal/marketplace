@@ -14,8 +14,8 @@ class AppFilter(BaseFilterSet):
         field_name="short_description", lookup_expr="icontains"
     )
     status = CharFilter(field_name="status", lookup_expr="exact")
-    category = UUIDFilter(field_name="category__id")
-    category_name = CharFilter(field_name="category__name", lookup_expr="icontains")
+    category = UUIDFilter(field_name="categories__id")
+    category_name = CharFilter(field_name="categories__name", lookup_expr="icontains")
     is_free = BooleanFilter(field_name="is_free")
     or_search = CharFilter(field_name="or_search", method="OR")
 

@@ -38,7 +38,6 @@ def create_app(
     name: str,
     short_description: str = "",
     description: str = "",
-    category: Category = None,
     icon_url: str = "",
     screenshots: list = None,
     is_free: bool = True,
@@ -49,7 +48,6 @@ def create_app(
         name=name,
         short_description=short_description,
         description=description,
-        category=category,
         icon_url=icon_url,
         screenshots=screenshots or [],
         is_free=is_free,
@@ -66,7 +64,6 @@ def update_app(*, app: App, data: dict) -> App:
         "status",
         "icon_url",
         "screenshots",
-        "category",
         "is_free",
         "amount",
         "currency",
@@ -208,17 +205,33 @@ def build_launch_url(*, app_launch: AppLaunch) -> str:
 def create_payment(*, app: App, user: User) -> Payment:
     if app.is_free or app.amount is None:
         raise ValidationError("This app is free — no payment required.")
-    return Payment.objects.create_payment(
-        app=app, user=user, amount=app.amount, currency=app.currency
+    if Payment.objects.filter(
+        app=app, user=user, status=Payment.Status.COMPLETED
+    ).exists():
+        raise ValidationError("Payment for this app already exists.")
+    payment = Payment(
+        app=app,
+        user=user,
+        amount=app.amount,
+        currency=app.currency,
+        status=Payment.Status.COMPLETED,
     )
+    payment.full_clean()
+    payment.save()
+    return payment
 
 
-def install_app(*, app: App, user: User, payment: Payment = None) -> Installation:
+def install_app(*, app: App, user: User) -> Installation:
     if app.status != App.Status.ACTIVE:
         raise ValidationError("Only active apps can be installed.")
 
-    if not app.is_free and payment is None:
-        raise ValidationError("This app requires payment before installation.")
+    payment = None
+    if not app.is_free:
+        payment = Payment.objects.filter(
+            app=app, user=user, status=Payment.Status.COMPLETED
+        ).first()
+        if payment is None:
+            raise ValidationError("This app requires payment before installation.")
 
     existing = (
         Installation.objects.all_with_deleted().filter(app=app, user=user).first()
@@ -227,15 +240,17 @@ def install_app(*, app: App, user: User, payment: Payment = None) -> Installatio
         if existing.deleted:
             existing.deleted = None
             existing.active = True
+            existing.payment = payment
             existing.save()
             return existing
         if existing.active:
             raise ValidationError("App is already installed.")
         existing.active = True
-        existing.save(update_fields=["active"])
+        existing.payment = payment
+        existing.save(update_fields=["active", "payment"])
         return existing
 
-    return Installation.objects.create_installation(app=app, user=user)
+    return Installation.objects.create_installation(app=app, user=user, payment=payment)
 
 
 def uninstall_app(*, app: App, user: User) -> None:

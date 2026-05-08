@@ -6,6 +6,7 @@ from open_schools_platform.marketplace_management.views import (
     AppDetailApi,
     AppInstallApi,
     AppUninstallApi,
+    AppPayApi,
     UserInstallationListApi,
     AppReviewListApi,
     AppReviewCreateUpdateApi,
@@ -31,6 +32,11 @@ urlpatterns = [
         "apps/<uuid:app_id>/uninstall",
         AppUninstallApi.as_view(),
         name="marketplace-apps-uninstall",
+    ),
+    path(
+        "apps/<uuid:app_id>/pay",
+        AppPayApi.as_view(),
+        name="marketplace-apps-pay",
     ),
     path(
         "apps/<uuid:app_id>/launch",

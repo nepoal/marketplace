@@ -57,14 +57,26 @@ class App(BaseModel):
     )
     icon_url = models.URLField(blank=True)
     screenshots = models.JSONField(default=list, blank=True)
-    category = models.ForeignKey(
-        Category, on_delete=models.SET_NULL, null=True, blank=True, related_name="apps"
-    )
+    categories = models.ManyToManyField(Category, blank=True, related_name="apps")
     is_free = models.BooleanField(default=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     currency = models.CharField(max_length=10, default="RUB", blank=True)
 
     objects = AppManager()
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        if self.is_free:
+            self.amount = None
+        else:
+            errors = {}
+            if self.amount is None:
+                errors["amount"] = "Укажите цену для платного приложения."
+            if not self.currency:
+                errors["currency"] = "Укажите валюту для платного приложения."
+            if errors:
+                raise ValidationError(errors)
 
     def __str__(self):
         return self.name
@@ -300,6 +312,9 @@ class OidcRefreshToken(BaseModel):
     def get_client_id(self) -> str:
         return self.client.client_id
 
+    def check_client(self, client) -> bool:
+        return self.client_id == client.pk
+
     def __str__(self):
         return f"RefreshToken({self.token[:16]}...)"
 
@@ -336,9 +351,9 @@ class AppLaunch(BaseModel):
 
 
 class InstallationManager(BaseManager):
-    def create_installation(self, app, user, expires_at=None):
+    def create_installation(self, app, user, payment=None, expires_at=None):
         installation = self.model(
-            app=app, user=user, active=True, expires_at=expires_at
+            app=app, user=user, active=True, payment=payment, expires_at=expires_at
         )
         installation.full_clean()
         installation.save(using=self._db)

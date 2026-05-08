@@ -14,18 +14,15 @@ from open_schools_platform.marketplace_management.models import (
 
 
 def _is_moderator(user) -> bool:
-    try:
-        user.moderator_profile
-        return True
-    except Exception:
+    if not getattr(user, "is_authenticated", False):
         return False
+    return ModeratorProfile.objects.filter(user=user).exists()
 
 
 def _is_chief_moderator(user) -> bool:
-    try:
-        return user.moderator_profile.is_chief
-    except Exception:
+    if not getattr(user, "is_authenticated", False):
         return False
+    return ModeratorProfile.objects.filter(user=user, is_chief=True).exists()
 
 
 def _is_staff_or_superuser(user) -> bool:
@@ -74,22 +71,42 @@ class MarketplaceModelAdmin(admin.ModelAdmin):
         return _is_chief_moderator(request.user)
 
 
-class AppVersionInline(admin.TabularInline):
+class MarketplaceInlineMixin:
+    def _user_can_access(self, request):
+        return _is_staff_or_superuser(request.user) or _is_moderator(request.user)
+
+    def has_view_permission(self, request, obj=None):
+        return self._user_can_access(request)
+
+    def has_add_permission(self, request, obj=None):
+        return self._user_can_access(request)
+
+    def has_change_permission(self, request, obj=None):
+        return self._user_can_access(request)
+
+    def has_delete_permission(self, request, obj=None):
+        if _is_staff_or_superuser(request.user):
+            return True
+        return _is_chief_moderator(request.user)
+
+
+class AppVersionInline(MarketplaceInlineMixin, admin.TabularInline):
     model = AppVersion
     extra = 0
     readonly_fields = ("created_at",)
 
 
-class AppUrlInline(admin.StackedInline):
+class AppUrlInline(MarketplaceInlineMixin, admin.StackedInline):
     model = AppUrl
     extra = 0
+    readonly_fields = ("created_at",)
 
 
-class OidcClientInline(admin.StackedInline):
+class OidcClientInline(MarketplaceInlineMixin, admin.StackedInline):
     model = OidcClient
     extra = 0
-    readonly_fields = ("client_id", "client_secret_hash", "created_at")
-    fields = ("client_id", "redirect_uris", "created_at")
+    readonly_fields = ("client_id", "created_at")
+    exclude = ("client_secret_hash",)
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -106,12 +123,12 @@ class AppAdmin(MarketplaceModelAdmin):
     list_display = (
         "name",
         "status",
-        "category",
+        "categories_display",
         "is_free",
         "average_rating_display",
         "created_at",
     )
-    list_filter = ("status", "is_free", "category")
+    list_filter = ("status", "is_free", "categories")
     search_fields = ("name", "short_description")
     readonly_fields = (
         "created_at",
@@ -129,7 +146,7 @@ class AppAdmin(MarketplaceModelAdmin):
                     "name",
                     "short_description",
                     "description",
-                    "category",
+                    "categories",
                     "status",
                 )
             },
@@ -148,6 +165,11 @@ class AppAdmin(MarketplaceModelAdmin):
             },
         ),
     )
+
+    def categories_display(self, obj):
+        return ", ".join(obj.categories.values_list("name", flat=True))
+
+    categories_display.short_description = "Categories"
 
     def average_rating_display(self, obj):
         rating = obj.average_rating

@@ -83,7 +83,9 @@ class AuthorizationCodeGrant(grants.AuthorizationCodeGrant):
 
     def create_token_response(self):
         status, token, headers = super().create_token_response()
-        nonce = self.request.credential.get_nonce()
+        if status != 200 or not getattr(self.request, "authorization_code", None):
+            return status, token, headers
+        nonce = self.request.authorization_code.get_nonce()
         token["id_token"] = generate_id_token(
             user=self.request.user,
             client=self.request.client,
@@ -118,7 +120,9 @@ class RefreshTokenGrant(grants.RefreshTokenGrant):
 
     def create_token_response(self):
         status, token, headers = super().create_token_response()
-        token["refresh_token"] = self.request.credential.token
+        if status != 200 or not getattr(self.request, "refresh_token", None):
+            return status, token, headers
+        token["refresh_token"] = self.request.refresh_token.token
         token["id_token"] = generate_id_token(
             user=self.request.user,
             client=self.request.client,
@@ -132,6 +136,27 @@ class MarketplaceAuthorizationServer(AuthorizationServer):
         from open_schools_platform.marketplace_management.models import OidcClient
 
         super().__init__(client_model=OidcClient, token_model=None)
+
+    def generate_token(
+        self,
+        grant_type,
+        client,
+        user=None,
+        scope=None,
+        expires_in=None,
+        include_refresh_token=True,
+    ):
+        import secrets
+
+        token = {
+            "token_type": "Bearer",
+            "access_token": secrets.token_urlsafe(42),
+            "expires_in": ACCESS_TOKEN_TTL,
+            "scope": scope or "openid",
+        }
+        if include_refresh_token:
+            token["refresh_token"] = secrets.token_urlsafe(48)
+        return token
 
     def query_client(self, client_id: str):
         from open_schools_platform.marketplace_management.models import OidcClient
@@ -165,9 +190,9 @@ class MarketplaceAuthorizationServer(AuthorizationServer):
                 access_token=access_token_obj,
                 expires_at=now + timezone.timedelta(seconds=REFRESH_TOKEN_TTL),
             )
-        elif isinstance(getattr(request, "credential", None), OidcRefreshToken):
-            request.credential.access_token = access_token_obj
-            request.credential.save(update_fields=["access_token"])
+        elif isinstance(getattr(request, "refresh_token", None), OidcRefreshToken):
+            request.refresh_token.access_token = access_token_obj
+            request.refresh_token.save(update_fields=["access_token"])
 
         return access_token_obj
 

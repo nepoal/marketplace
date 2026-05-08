@@ -23,22 +23,16 @@ from open_schools_platform.user_management.users.models import User
 @selector_factory(App)
 def get_apps(*, filters=None, prefetch_related_list=None) -> QuerySet:
     filters = filters or {}
-    qs = (
-        App.objects.prefetch_related(*prefetch_related_list)
-        .select_related("category")
-        .all()
-    )
-    return AppFilter(filters, qs).qs
+    qs = App.objects.prefetch_related(*prefetch_related_list, "categories").all()
+    return AppFilter(filters, qs).qs.distinct()
 
 
 @selector_factory(App)
 def get_app(*, filters=None, prefetch_related_list=None) -> App:
     filters = filters or {}
-    qs = (
-        App.objects.prefetch_related(*prefetch_related_list, "reviews__user")
-        .select_related("category")
-        .all()
-    )
+    qs = App.objects.prefetch_related(
+        *prefetch_related_list, "categories", "reviews__user"
+    ).all()
     return AppFilter(filters, qs).qs.first()
 
 

@@ -30,7 +30,7 @@ class AppVersionSerializer(serializers.ModelSerializer):
 
 
 class AppListSerializer(serializers.ModelSerializer):
-    category = CategorySerializer(read_only=True)
+    categories = CategorySerializer(many=True, read_only=True)
     average_rating = serializers.FloatField(read_only=True)
     reviews_count = serializers.IntegerField(read_only=True)
 
@@ -42,7 +42,7 @@ class AppListSerializer(serializers.ModelSerializer):
             "short_description",
             "status",
             "icon_url",
-            "category",
+            "categories",
             "is_free",
             "amount",
             "currency",
@@ -61,7 +61,7 @@ class ReviewSerializer(serializers.ModelSerializer):
 
 
 class AppDetailSerializer(serializers.ModelSerializer):
-    category = CategorySerializer(read_only=True)
+    categories = CategorySerializer(many=True, read_only=True)
     latest_version = serializers.SerializerMethodField()
     reviews = ReviewSerializer(many=True, read_only=True)
     average_rating = serializers.FloatField(read_only=True)
@@ -81,7 +81,7 @@ class AppDetailSerializer(serializers.ModelSerializer):
             "status",
             "icon_url",
             "screenshots",
-            "category",
+            "categories",
             "latest_version",
             "is_free",
             "amount",
