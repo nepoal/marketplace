@@ -1,7 +1,5 @@
-from django.http import HttpResponse
 from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
-from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.exceptions import NotFound
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -31,7 +29,6 @@ from open_schools_platform.marketplace_management.selectors import (
     get_apps,
     get_reviews,
     get_installations,
-    get_access_token,
     get_user_review,
     get_categories,
 )
@@ -43,12 +40,7 @@ from open_schools_platform.marketplace_management.serializers import (
     InstallationSerializer,
     PaymentSerializer,
     AppLaunchResponseSerializer,
-    OidcTokenResponseSerializer,
-    OidcUserInfoSerializer,
     CategorySerializer,
-)
-from open_schools_platform.marketplace_management.oidc_server import (
-    authorization_server,
 )
 from open_schools_platform.marketplace_management.services import (
     create_or_update_review,
@@ -57,7 +49,6 @@ from open_schools_platform.marketplace_management.services import (
     uninstall_app,
     create_app_launch,
     build_launch_url,
-    initiate_oidc_auth,
     create_payment,
 )
 
@@ -150,6 +141,46 @@ class AppUninstallApi(ApiAuthMixin, APIView):
         return Response(status=204)
 
 
+class AppPayApi(ApiAuthMixin, APIView):
+    @swagger_auto_schema(
+        operation_description=(
+            "Pay for a paid app. Price is taken from the app record at the time of payment."
+        ),
+        tags=TAGS,
+        responses={
+            201: PaymentSerializer(),
+            400: "App is free or payment already exists",
+            404: "Not found",
+        },
+    )
+    def post(self, request, app_id):
+        app = get_app(filters={"id": str(app_id)}, empty_exception=True)
+        payment = create_payment(app=app, user=request.user)
+        return Response(PaymentSerializer(payment).data, status=201)
+
+
+class AppLaunchApi(ApiAuthMixin, APIView):
+    @swagger_auto_schema(
+        operation_description=(
+            "Get a launch URL for opening an installed app in an iframe."
+            "The returned launch_token is single-use and expires in 5 minutes."
+        ),
+        tags=TAGS,
+        responses={200: AppLaunchResponseSerializer()},
+    )
+    def get(self, request, app_id):
+        app = get_app(filters={"id": str(app_id)}, empty_exception=True)
+        launch = create_app_launch(app=app, user=request.user)
+        launch_url = build_launch_url(app_launch=launch)
+        return Response(
+            {
+                "launch_url": launch_url,
+                "launch_token": launch.launch_token,
+                "expires_at": launch.token_exp,
+            }
+        )
+
+
 class UserInstallationListApi(ApiAuthMixin, ListAPIView):
     queryset = Installation.objects.all()
     filterset_class = InstallationFilter
@@ -224,185 +255,3 @@ class AppReviewCreateUpdateApi(ApiAuthMixin, APIView):
             raise NotFound("You have not reviewed this app.")
         delete_review(review=review, user=request.user)
         return Response(status=204)
-
-
-class AppPayApi(ApiAuthMixin, APIView):
-    @swagger_auto_schema(
-        operation_description=(
-            "Pay for a paid app. Price is taken from the app record at the time of payment."
-        ),
-        tags=TAGS,
-        responses={
-            201: PaymentSerializer(),
-            400: "App is free or payment already exists",
-            404: "Not found",
-        },
-    )
-    def post(self, request, app_id):
-        app = get_app(filters={"id": str(app_id)}, empty_exception=True)
-        payment = create_payment(app=app, user=request.user)
-        return Response(PaymentSerializer(payment).data, status=201)
-
-
-class AppLaunchApi(ApiAuthMixin, APIView):
-    @swagger_auto_schema(
-        operation_description=(
-            "Get a launch URL for opening an installed app in an iframe."
-            "The returned launch_token is single-use and expires in 5 minutes."
-        ),
-        tags=TAGS,
-        responses={200: AppLaunchResponseSerializer()},
-    )
-    def get(self, request, app_id):
-        app = get_app(filters={"id": str(app_id)}, empty_exception=True)
-        launch = create_app_launch(app=app, user=request.user)
-        launch_url = build_launch_url(app_launch=launch)
-        return Response(
-            {
-                "launch_url": launch_url,
-                "launch_token": launch.launch_token,
-                "expires_at": launch.token_exp,
-            }
-        )
-
-
-class OidcAuthApi(APIView):
-    permission_classes = (AllowAny,)
-
-    @swagger_auto_schema(
-        operation_description=("OIDC Authorization endpoint."),
-        tags=TAGS,
-        manual_parameters=[
-            openapi.Parameter(
-                "client_id", openapi.IN_QUERY, type=openapi.TYPE_STRING, required=True
-            ),
-            openapi.Parameter(
-                "scope", openapi.IN_QUERY, type=openapi.TYPE_STRING, required=True
-            ),
-            openapi.Parameter(
-                "response_type",
-                openapi.IN_QUERY,
-                type=openapi.TYPE_STRING,
-                required=True,
-            ),
-            openapi.Parameter(
-                "redirect_uri",
-                openapi.IN_QUERY,
-                type=openapi.TYPE_STRING,
-                required=True,
-            ),
-            openapi.Parameter(
-                "nonce", openapi.IN_QUERY, type=openapi.TYPE_STRING, required=False
-            ),
-            openapi.Parameter(
-                "launch_token",
-                openapi.IN_QUERY,
-                type=openapi.TYPE_STRING,
-                required=True,
-            ),
-        ],
-        responses={302: "Redirect to redirect_uri with authorization code"},
-    )
-    def get(self, request):
-        params = request.GET
-        required = (
-            "client_id",
-            "scope",
-            "response_type",
-            "redirect_uri",
-            "launch_token",
-        )
-        missing = [p for p in required if not params.get(p)]
-        if missing:
-            raise ValidationError(f"Missing required parameters: {', '.join(missing)}")
-
-        redirect_url, _code, _id_token = initiate_oidc_auth(
-            client_id=params["client_id"],
-            redirect_uri=params["redirect_uri"],
-            scope=params["scope"],
-            response_type=params["response_type"],
-            nonce=params.get("nonce", ""),
-            launch_token=params["launch_token"],
-        )
-        return HttpResponse(status=302, headers={"Location": redirect_url})
-
-
-class OidcTokenApi(APIView):
-    permission_classes = (AllowAny,)
-
-    @swagger_auto_schema(
-        operation_description=("OIDC Token endpoint."),
-        tags=TAGS,
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                "grant_type": openapi.Schema(
-                    type=openapi.TYPE_STRING,
-                    description="authorization_code | refresh_token",
-                ),
-                "code": openapi.Schema(type=openapi.TYPE_STRING),
-                "redirect_uri": openapi.Schema(type=openapi.TYPE_STRING),
-                "client_id": openapi.Schema(type=openapi.TYPE_STRING),
-                "client_secret": openapi.Schema(type=openapi.TYPE_STRING),
-                "refresh_token": openapi.Schema(type=openapi.TYPE_STRING),
-            },
-            required=["grant_type"],
-        ),
-        responses={200: OidcTokenResponseSerializer()},
-    )
-    def post(self, request):
-        import json
-
-        http_response = authorization_server.create_token_response(request._request)
-        try:
-            data = json.loads(http_response.content)
-        except (TypeError, ValueError):
-            data = {"error": http_response.content.decode("utf-8", errors="replace")}
-        return Response(data, status=http_response.status_code)
-
-
-class OidcUserInfoApi(APIView):
-    permission_classes = (AllowAny,)
-
-    @swagger_auto_schema(
-        operation_description=(
-            "OIDC UserInfo endpoint."
-            "Pass 'Authorization: Bearer <access_token>' header obtained from /oidc/token."
-        ),
-        tags=TAGS,
-        manual_parameters=[
-            openapi.Parameter(
-                "Authorization",
-                openapi.IN_HEADER,
-                type=openapi.TYPE_STRING,
-                description="Bearer <access_token>",
-                required=True,
-            ),
-        ],
-        responses={200: OidcUserInfoSerializer(), 401: "Invalid or expired token"},
-    )
-    def get(self, request):
-        from rest_framework.exceptions import AuthenticationFailed
-
-        auth_header = request.headers.get("Authorization", "")
-        if not auth_header.startswith("Bearer "):
-            raise AuthenticationFailed(
-                "Authorization header must be 'Bearer <access_token>'."
-            )
-
-        token_value = auth_header[len("Bearer "):]
-        access_token = get_access_token(filters={"token": token_value})
-
-        if not access_token:
-            raise AuthenticationFailed("Invalid access_token.")
-        if access_token.is_expired:
-            raise AuthenticationFailed("access_token has expired.")
-
-        user = access_token.user
-        return Response(
-            {
-                "sub": str(user.id),
-                "name": user.name,
-                "phone": str(user.phone) if user.phone else "",
-            }
-        )

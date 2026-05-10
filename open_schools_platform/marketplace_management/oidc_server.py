@@ -4,11 +4,14 @@ from authlib.integrations.django_oauth2 import AuthorizationServer
 from authlib.jose import jwt as authlib_jwt
 from authlib.oauth2.rfc6749 import grants
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 
-REFRESH_TOKEN_TTL = 30 * 86400  # 30 days
-AUTH_CODE_TTL = 300  # 5 minutes
-ACCESS_TOKEN_TTL = 3600  # 1 hour
+from open_schools_platform.marketplace_management.constants import (
+    AUTH_CODE_TTL,
+    ACCESS_TOKEN_TTL,
+    REFRESH_TOKEN_TTL,
+)
 
 
 def get_issuer() -> str:
@@ -18,6 +21,11 @@ def get_issuer() -> str:
 def generate_id_token(
     user, client, nonce: str = "", ttl: int = ACCESS_TOKEN_TTL
 ) -> str:
+    """Generate a signed HS256 JWT id_token with standard OIDC claims.
+
+    Nonce is included only when provided. SECRET_KEY is encoded to bytes
+    if it arrives as a string, since authlib requires bytes.
+    """
     now = int(time.time())
     header = {"alg": "HS256"}
     payload = {
@@ -41,6 +49,8 @@ def generate_id_token(
 
 
 class AuthorizationCodeGrant(grants.AuthorizationCodeGrant):
+    """Authorization Code grant that stores codes in the DB and appends id_token to the response."""
+
     TOKEN_ENDPOINT_AUTH_METHODS = ["client_secret_basic", "client_secret_post"]
 
     def save_authorization_code(self, code: str, request):
@@ -82,6 +92,7 @@ class AuthorizationCodeGrant(grants.AuthorizationCodeGrant):
         return authorization_code.user
 
     def create_token_response(self):
+        """Extend the parent response with id_token when the grant succeeds."""
         status, token, headers = super().create_token_response()
         if status != 200 or not getattr(self.request, "authorization_code", None):
             return status, token, headers
@@ -95,6 +106,8 @@ class AuthorizationCodeGrant(grants.AuthorizationCodeGrant):
 
 
 class RefreshTokenGrant(grants.RefreshTokenGrant):
+    """Refresh Token grant that reuses the same refresh token (no rotation) and appends id_token."""
+
     TOKEN_ENDPOINT_AUTH_METHODS = ["client_secret_basic", "client_secret_post"]
     INCLUDE_NEW_REFRESH_TOKEN = False
 
@@ -119,6 +132,7 @@ class RefreshTokenGrant(grants.RefreshTokenGrant):
         pass
 
     def create_token_response(self):
+        """Extend the parent response with the original refresh_token and a fresh id_token."""
         status, token, headers = super().create_token_response()
         if status != 200 or not getattr(self.request, "refresh_token", None):
             return status, token, headers
@@ -131,6 +145,7 @@ class RefreshTokenGrant(grants.RefreshTokenGrant):
 
 
 class MarketplaceAuthorizationServer(AuthorizationServer):
+    """Authorization server that stores tokens in the DB instead of using the default authlib model."""
 
     def __init__(self):
         from open_schools_platform.marketplace_management.models import OidcClient
@@ -167,6 +182,11 @@ class MarketplaceAuthorizationServer(AuthorizationServer):
             return None
 
     def save_token(self, token: dict, request):
+        """Save access and refresh tokens to the DB.
+
+        For authorization_code grant a new refresh token is created.
+        For refresh_token grant the existing token is reused — only its access_token FK is updated.
+        """
         from open_schools_platform.marketplace_management.models import (
             OidcAccessToken,
             OidcRefreshToken,
@@ -174,25 +194,26 @@ class MarketplaceAuthorizationServer(AuthorizationServer):
 
         now = timezone.now()
 
-        access_token_obj = OidcAccessToken.objects.create(
-            token=token["access_token"],
-            client=request.client,
-            user=request.user,
-            scope=token.get("scope", "openid"),
-            expires_at=now + timezone.timedelta(seconds=token["expires_in"]),
-        )
-
-        if "refresh_token" in token:
-            OidcRefreshToken.objects.create(
-                token=token["refresh_token"],
+        with transaction.atomic():
+            access_token_obj = OidcAccessToken.objects.create(
+                token=token["access_token"],
                 client=request.client,
                 user=request.user,
-                access_token=access_token_obj,
-                expires_at=now + timezone.timedelta(seconds=REFRESH_TOKEN_TTL),
+                scope=token.get("scope", "openid"),
+                expires_at=now + timezone.timedelta(seconds=token["expires_in"]),
             )
-        elif isinstance(getattr(request, "refresh_token", None), OidcRefreshToken):
-            request.refresh_token.access_token = access_token_obj
-            request.refresh_token.save(update_fields=["access_token"])
+
+            if "refresh_token" in token:
+                OidcRefreshToken.objects.create(
+                    token=token["refresh_token"],
+                    client=request.client,
+                    user=request.user,
+                    access_token=access_token_obj,
+                    expires_at=now + timezone.timedelta(seconds=REFRESH_TOKEN_TTL),
+                )
+            elif isinstance(getattr(request, "refresh_token", None), OidcRefreshToken):
+                request.refresh_token.access_token = access_token_obj
+                request.refresh_token.save(update_fields=["access_token"])
 
         return access_token_obj
 

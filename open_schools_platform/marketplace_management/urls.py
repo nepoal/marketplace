@@ -1,16 +1,18 @@
 from django.urls import path
 
-from open_schools_platform.marketplace_management.views import (
+from open_schools_platform.marketplace_management.views.app import (
     CategoryListApi,
     AppListApi,
     AppDetailApi,
     AppInstallApi,
     AppUninstallApi,
     AppPayApi,
+    AppLaunchApi,
     UserInstallationListApi,
     AppReviewListApi,
     AppReviewCreateUpdateApi,
-    AppLaunchApi,
+)
+from open_schools_platform.marketplace_management.views.oidc import (
     OidcAuthApi,
     OidcTokenApi,
     OidcUserInfoApi,

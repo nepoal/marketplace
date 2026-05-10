@@ -1,10 +1,15 @@
 import secrets
 from typing import Tuple
 
+from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError, PermissionDenied
 
 from open_schools_platform.common.services import model_update
+from open_schools_platform.marketplace_management.constants import (
+    AUTH_CODE_TTL,
+    LAUNCH_TOKEN_TTL,
+)
 from open_schools_platform.marketplace_management.models import (
     App,
     AppVersion,
@@ -13,15 +18,9 @@ from open_schools_platform.marketplace_management.models import (
     Installation,
     Review,
     Payment,
-    OidcClient,
-    OidcAuthorizationCode,
     AppLaunch,
-    ModeratorProfile,
 )
 from open_schools_platform.user_management.users.models import User
-
-AUTH_CODE_TTL = 300  # 5 minutes (must match oidc_server.AUTH_CODE_TTL)
-LAUNCH_TOKEN_TTL = 300  # 5 minutes
 
 
 def create_category(*, name: str) -> Category:
@@ -100,85 +99,6 @@ def update_app_url(*, app_url: AppUrl, data: dict) -> AppUrl:
     return app_url
 
 
-def create_oidc_client_for_app(
-    *, app: App, redirect_uris: list
-) -> Tuple[OidcClient, str]:
-    if hasattr(app, "oidc_client"):
-        raise ValidationError("This app already has OIDC credentials.")
-    client, raw_secret = OidcClient.objects.create_client(
-        app=app, redirect_uris=redirect_uris
-    )
-    return client, raw_secret
-
-
-def update_oidc_redirect_uris(
-    *, oidc_client: OidcClient, redirect_uris: list
-) -> OidcClient:
-    oidc_client.redirect_uris = redirect_uris
-    oidc_client.save(update_fields=["redirect_uris", "updated_at"])
-    return oidc_client
-
-
-def initiate_oidc_auth(
-    *,
-    client_id: str,
-    redirect_uri: str,
-    scope: str,
-    response_type: str,
-    nonce: str,
-    launch_token: str,
-) -> Tuple[str, str, str]:
-    from open_schools_platform.marketplace_management.oidc_server import (
-        generate_id_token,
-    )
-    from open_schools_platform.marketplace_management.selectors import (
-        get_oidc_client,
-        get_app_launch,
-    )
-
-    client = get_oidc_client(
-        filters={"client_id": client_id},
-        empty_exception=True,
-        empty_message="Unknown client_id.",
-    )
-
-    if not client.check_redirect_uri(redirect_uri):
-        raise PermissionDenied("redirect_uri is not registered for this client.")
-
-    if "openid" not in scope.split():
-        raise ValidationError("scope must include 'openid'.")
-
-    launch = get_app_launch(
-        filters={"launch_token": launch_token},
-        empty_exception=True,
-        empty_message="Invalid or missing launch_token.",
-    )
-
-    if launch.is_expired:
-        raise ValidationError("launch_token has expired.")
-
-    if launch.app.oidc_client.client_id != client_id:
-        raise PermissionDenied("launch_token does not belong to this client.")
-
-    user = launch.user
-    code = secrets.token_urlsafe(48)
-
-    OidcAuthorizationCode.objects.create(
-        code=code,
-        client=client,
-        user=user,
-        redirect_uri=redirect_uri,
-        nonce=nonce,
-        scope=scope,
-        expires_at=timezone.now() + timezone.timedelta(seconds=AUTH_CODE_TTL),
-    )
-
-    id_token = generate_id_token(user=user, client=client, nonce=nonce)
-
-    fragment = f"code={code}&id_token={id_token}"
-    return f"{redirect_uri}#{fragment}", code, id_token
-
-
 def create_app_launch(*, app: App, user: User) -> AppLaunch:
     if app.status != App.Status.ACTIVE:
         raise ValidationError("Cannot launch an app that is not active.")
@@ -190,6 +110,11 @@ def create_app_launch(*, app: App, user: User) -> AppLaunch:
 
 
 def build_launch_url(*, app_launch: AppLaunch) -> str:
+    """Build the URL used to open an app in an iframe.
+
+    Appends platform_user_id and launch_token as query parameters,
+    using '?' or '&' depending on whether the base URL already has a query string.
+    """
     try:
         base = app_launch.app.url_config.launch_url
     except AppUrl.DoesNotExist:
@@ -222,6 +147,11 @@ def create_payment(*, app: App, user: User) -> Payment:
 
 
 def install_app(*, app: App, user: User) -> Installation:
+    """Install an app for the user.
+
+    For paid apps a completed payment must exist first.
+    Restores soft-deleted installations instead of creating new ones.
+    """
     if app.status != App.Status.ACTIVE:
         raise ValidationError("Only active apps can be installed.")
 
@@ -233,24 +163,25 @@ def install_app(*, app: App, user: User) -> Installation:
         if payment is None:
             raise ValidationError("This app requires payment before installation.")
 
-    existing = (
-        Installation.objects.all_with_deleted().filter(app=app, user=user).first()
-    )
-    if existing:
-        if existing.deleted:
-            existing.deleted = None
+    with transaction.atomic():
+        existing = (
+            Installation.objects.all_with_deleted().filter(app=app, user=user).first()
+        )
+        if existing:
+            if existing.deleted:
+                existing.deleted = None
+                existing.active = True
+                existing.payment = payment
+                existing.save()
+                return existing
+            if existing.active:
+                raise ValidationError("App is already installed.")
             existing.active = True
             existing.payment = payment
-            existing.save()
+            existing.save(update_fields=["active", "payment"])
             return existing
-        if existing.active:
-            raise ValidationError("App is already installed.")
-        existing.active = True
-        existing.payment = payment
-        existing.save(update_fields=["active", "payment"])
-        return existing
 
-    return Installation.objects.create_installation(app=app, user=user, payment=payment)
+        return Installation.objects.create_installation(app=app, user=user, payment=payment)
 
 
 def uninstall_app(*, app: App, user: User) -> None:
@@ -264,6 +195,11 @@ def uninstall_app(*, app: App, user: User) -> None:
 def create_or_update_review(
     *, app: App, user: User, rating: int, message: str = ""
 ) -> Review:
+    """Create or update a review, restoring soft-deleted ones if they exist.
+
+    New reviews require the user to have the app installed.
+    Updating an existing review does not require an active installation.
+    """
     existing = Review.objects.all_with_deleted().filter(app=app, user=user).first()
     if existing:
         existing.deleted = None
@@ -284,14 +220,3 @@ def delete_review(*, review: Review, user: User) -> None:
     if review.user_id != user.id:
         raise PermissionDenied("You can only delete your own reviews.")
     review.delete()
-
-
-def create_moderator(*, user: User, is_chief: bool = False) -> ModeratorProfile:
-    if hasattr(user, "moderator_profile"):
-        raise ValidationError("This user is already a moderator.")
-    return ModeratorProfile.objects.create_moderator(user=user, is_chief=is_chief)
-
-
-def update_moderator(*, profile: ModeratorProfile, data: dict) -> ModeratorProfile:
-    profile, _ = model_update(instance=profile, fields=["is_chief"], data=data)
-    return profile

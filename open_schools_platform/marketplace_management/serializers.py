@@ -17,16 +17,24 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = ("id", "name")
 
 
+class AppVersionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AppVersion
+        fields = ("id", "version", "description", "date")
+
+
 class AppUrlSerializer(serializers.ModelSerializer):
     class Meta:
         model = AppUrl
         fields = ("base_url", "launch_path", "launch_url")
 
 
-class AppVersionSerializer(serializers.ModelSerializer):
+class ReviewSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source="user.name", read_only=True)
+
     class Meta:
-        model = AppVersion
-        fields = ("id", "version", "description", "date")
+        model = Review
+        fields = ("id", "user_name", "rating", "message", "created_at", "updated_at")
 
 
 class AppListSerializer(serializers.ModelSerializer):
@@ -50,14 +58,6 @@ class AppListSerializer(serializers.ModelSerializer):
             "reviews_count",
             "created_at",
         )
-
-
-class ReviewSerializer(serializers.ModelSerializer):
-    user_name = serializers.CharField(source="user.name", read_only=True)
-
-    class Meta:
-        model = Review
-        fields = ("id", "user_name", "rating", "message", "created_at", "updated_at")
 
 
 class AppDetailSerializer(serializers.ModelSerializer):
@@ -135,6 +135,4 @@ class OidcTokenResponseSerializer(serializers.Serializer):
 
 
 class OidcUserInfoSerializer(serializers.Serializer):
-    sub = serializers.CharField()
-    name = serializers.CharField()
-    phone = serializers.CharField()
+    user = serializers.DictField()
