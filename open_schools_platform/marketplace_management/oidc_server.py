@@ -14,7 +14,7 @@ from open_schools_platform.marketplace_management.constants import (
 
 
 def get_issuer() -> str:
-    return getattr(settings, "MARKETPLACE_OIDC_ISSUER", "https://platform.local")
+    return getattr(settings, "MARKETPLACE_OIDC_ISSUER", "https://openschools.education")
 
 
 def generate_id_token(

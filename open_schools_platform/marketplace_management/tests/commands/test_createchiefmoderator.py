@@ -36,16 +36,22 @@ class CreateChiefModeratorCommandTests(TestCase):
         self.assertIn("updated", output)
         self.assertTrue(ModeratorProfile.objects.get(user=user).is_chief)
 
-    def test_demote_removes_chief_status(self):
+    def test_demote_deletes_moderator_profile(self):
         user = create_test_user()
         create_test_moderator(user=user, is_chief=True)
         output = self._call(str(user.phone), demote=True)
         self.assertIn("removed", output)
-        self.assertFalse(ModeratorProfile.objects.get(user=user).is_chief)
+        self.assertFalse(ModeratorProfile.objects.filter(user=user).exists())
 
     def test_demote_already_not_chief_prints_warning(self):
         user = create_test_user()
         create_test_moderator(user=user, is_chief=False)
         output = self._call(str(user.phone), demote=True)
         self.assertIn("Nothing changed", output)
-        self.assertFalse(ModeratorProfile.objects.get(user=user).is_chief)
+        self.assertTrue(ModeratorProfile.objects.filter(user=user).exists())
+
+    def test_demote_no_profile_prints_warning(self):
+        user = create_test_user()
+        output = self._call(str(user.phone), demote=True)
+        self.assertIn("Nothing changed", output)
+        self.assertFalse(ModeratorProfile.objects.filter(user=user).exists())

@@ -32,9 +32,16 @@ class Command(BaseCommand):
         except User.DoesNotExist:
             raise CommandError(f"User with phone '{phone}' not found.")
 
-        profile, created = ModeratorProfile.objects.get_or_create(user=user)
-
         if demote:
+            try:
+                profile = ModeratorProfile.objects.get(user=user)
+            except ModeratorProfile.DoesNotExist:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"User {user} is not a moderator. Nothing changed."
+                    )
+                )
+                return
             if not profile.is_chief:
                 self.stdout.write(
                     self.style.WARNING(
@@ -42,14 +49,14 @@ class Command(BaseCommand):
                     )
                 )
                 return
-            profile.is_chief = False
-            profile.save(update_fields=["is_chief"])
+            profile.delete()
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"Chief moderator status removed from {user} ({phone})."
+                    f"Moderator profile removed from {user} ({phone})."
                 )
             )
         else:
+            profile, created = ModeratorProfile.objects.get_or_create(user=user)
             profile.is_chief = True
             profile.save(update_fields=["is_chief"])
             action = "created and granted" if created else "updated — granted"

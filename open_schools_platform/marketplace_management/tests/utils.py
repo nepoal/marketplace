@@ -84,7 +84,11 @@ def create_test_installation(app: App, user: User, payment: Payment = None) -> I
     return Installation.objects.create_installation(app=app, user=user, payment=payment)
 
 
-def create_test_payment(app: App, user: User, status: str = Payment.Status.COMPLETED) -> Payment:
+def create_test_payment(
+    app: App,
+    user: User,
+    status: str = Payment.Status.COMPLETED,
+) -> Payment:
     payment = Payment.objects.create_payment(
         app=app,
         user=user,
