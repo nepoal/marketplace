@@ -106,7 +106,9 @@ class GetRefreshTokenSelectorTests(TestCase):
         self.oidc_client, _ = create_test_oidc_client_with_secret(app=self.app)
         self.user = create_test_user()
         access_token = _make_access_token(self.oidc_client, self.user)
-        self.refresh_token = _make_refresh_token(self.oidc_client, self.user, access_token)
+        self.refresh_token = _make_refresh_token(
+            self.oidc_client, self.user, access_token
+        )
 
     def test_get_by_token(self):
         result = get_refresh_token(filters={"token": self.refresh_token.token})

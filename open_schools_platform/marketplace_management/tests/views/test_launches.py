@@ -7,7 +7,9 @@ from rest_framework.test import APIClient
 from open_schools_platform.marketplace_management.models import App, Installation
 from open_schools_platform.marketplace_management.services.app import install_app
 from open_schools_platform.marketplace_management.tests.utils import create_test_app
-from open_schools_platform.user_management.users.tests.utils import create_logged_in_user
+from open_schools_platform.user_management.users.tests.utils import (
+    create_logged_in_user,
+)
 
 NS = "api:marketplace-management:marketplace"
 
@@ -47,7 +49,9 @@ class AppLaunchApiTests(TestCase):
 
     def test_inactive_app_returns_400(self):
         user = create_logged_in_user(instance=self)
-        pending_app = create_test_app(name="Pending", status=App.Status.PENDING, with_url=True)
+        pending_app = create_test_app(
+            name="Pending", status=App.Status.PENDING, with_url=True
+        )
         Installation.objects.create_installation(app=pending_app, user=user)
         response = self.client.get(self.url(pending_app.id))
         self.assertEqual(400, response.status_code)

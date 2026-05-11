@@ -8,7 +8,6 @@ from open_schools_platform.marketplace_management.services.oidc import (
 from open_schools_platform.marketplace_management.tests.utils import (
     create_test_app,
     create_test_oidc_client,
-    create_test_oidc_client_with_secret,
 )
 
 
@@ -31,13 +30,20 @@ class CreateOidcClientTests(TestCase):
 
     def test_duplicate_client_for_same_app_raises_error(self):
         app = create_test_app()
-        create_oidc_client_for_app(app=app, redirect_uris=["https://myapp.example.com/callback"])
+        create_oidc_client_for_app(
+            app=app, redirect_uris=["https://myapp.example.com/callback"]
+        )
         with self.assertRaises(ValidationError):
-            create_oidc_client_for_app(app=app, redirect_uris=["https://other.com/callback"])
+            create_oidc_client_for_app(
+                app=app, redirect_uris=["https://other.com/callback"]
+            )
 
     def test_multiple_redirect_uris_stored(self):
         app = create_test_app()
-        uris = ["https://myapp.example.com/callback", "https://myapp.example.com/callback2"]
+        uris = [
+            "https://myapp.example.com/callback",
+            "https://myapp.example.com/callback2",
+        ]
         client, _ = create_oidc_client_for_app(app=app, redirect_uris=uris)
         self.assertEqual(uris, client.redirect_uris)
 

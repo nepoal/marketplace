@@ -5,7 +5,10 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from open_schools_platform.marketplace_management.models import OidcAccessToken, OidcAuthorizationCode
+from open_schools_platform.marketplace_management.models import (
+    OidcAccessToken,
+    OidcAuthorizationCode,
+)
 from open_schools_platform.marketplace_management.tests.utils import (
     create_test_app,
     create_test_app_launch,
@@ -34,24 +37,31 @@ class OidcUserInfoApiTests(TestCase):
 
     def _obtain_access_token(self) -> str:
         launch = create_test_app_launch(app=self.app, user=self.user)
-        self.client.get(self.auth_url, {
-            "client_id": self.client_id,
-            "scope": "openid",
-            "response_type": "code id_token",
-            "redirect_uri": REDIRECT_URI,
-            "launch_token": launch.launch_token,
-            "nonce": "nonce-userinfo",
-        })
-        auth_code = OidcAuthorizationCode.objects.filter(client=self.oidc_client).first()
+        self.client.get(
+            self.auth_url,
+            {
+                "client_id": self.client_id,
+                "scope": "openid",
+                "response_type": "code id_token",
+                "redirect_uri": REDIRECT_URI,
+                "launch_token": launch.launch_token,
+                "nonce": "nonce-userinfo",
+            },
+        )
+        auth_code = OidcAuthorizationCode.objects.filter(
+            client=self.oidc_client
+        ).first()
         token_response = self.client.post(
             self.token_url,
-            urlencode({
-                "grant_type": "authorization_code",
-                "code": auth_code.code,
-                "redirect_uri": REDIRECT_URI,
-                "client_id": self.client_id,
-                "client_secret": self.raw_secret,
-            }),
+            urlencode(
+                {
+                    "grant_type": "authorization_code",
+                    "code": auth_code.code,
+                    "redirect_uri": REDIRECT_URI,
+                    "client_id": self.client_id,
+                    "client_secret": self.raw_secret,
+                }
+            ),
             content_type="application/x-www-form-urlencoded",
         )
         return token_response.data["access_token"]

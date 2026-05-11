@@ -5,14 +5,14 @@ from typing import Tuple
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError, PermissionDenied
 
-logger = logging.getLogger("marketplace_management")
-
 from open_schools_platform.marketplace_management.constants import AUTH_CODE_TTL
 from open_schools_platform.marketplace_management.models import (
     App,
     OidcClient,
     OidcAuthorizationCode,
 )
+
+logger = logging.getLogger("marketplace_management")
 
 
 def create_oidc_client_for_app(
@@ -64,7 +64,9 @@ def initiate_oidc_auth(
     )
 
     if not client.check_redirect_uri(redirect_uri):
-        logger.warning("Invalid redirect_uri: client_id=%s uri=%s", client_id, redirect_uri)
+        logger.warning(
+            "Invalid redirect_uri: client_id=%s uri=%s", client_id, redirect_uri
+        )
         raise PermissionDenied("redirect_uri is not registered for this client.")
 
     if not client.check_response_type(response_type):

@@ -51,9 +51,7 @@ class Command(BaseCommand):
                 return
             profile.delete()
             self.stdout.write(
-                self.style.SUCCESS(
-                    f"Moderator profile removed from {user} ({phone})."
-                )
+                self.style.SUCCESS(f"Moderator profile removed from {user} ({phone}).")
             )
         else:
             profile, created = ModeratorProfile.objects.get_or_create(user=user)

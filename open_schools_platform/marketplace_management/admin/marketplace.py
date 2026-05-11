@@ -1,6 +1,8 @@
 from django.contrib import admin
 
-from open_schools_platform.marketplace_management.admin.mixins import MarketplaceModelAdmin
+from open_schools_platform.marketplace_management.admin.mixins import (
+    MarketplaceModelAdmin,
+)
 from open_schools_platform.marketplace_management.models import (
     Review,
     Installation,

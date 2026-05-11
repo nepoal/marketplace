@@ -1,16 +1,9 @@
 import logging
-import secrets
-from typing import Tuple
 
 from django.db import transaction
-from django.utils import timezone
 from rest_framework.exceptions import ValidationError, PermissionDenied
-
-logger = logging.getLogger("marketplace_management")
-
 from open_schools_platform.common.services import model_update
 from open_schools_platform.marketplace_management.constants import (
-    AUTH_CODE_TTL,
     LAUNCH_TOKEN_TTL,
 )
 from open_schools_platform.marketplace_management.models import (
@@ -24,6 +17,9 @@ from open_schools_platform.marketplace_management.models import (
     AppLaunch,
 )
 from open_schools_platform.user_management.users.models import User
+
+
+logger = logging.getLogger("marketplace_management")
 
 
 def create_category(*, name: str) -> Category:
@@ -80,9 +76,7 @@ def create_app_version(*, app: App, version: str, description: str = "") -> AppV
     )
 
 
-def create_app_url(
-    *, app: App, base_url: str, launch_path: str = "/"
-) -> AppUrl:
+def create_app_url(*, app: App, base_url: str, launch_path: str = "/") -> AppUrl:
     if hasattr(app, "url_config"):
         raise ValidationError("This app already has a URL configuration.")
     return AppUrl.objects.create_url(
@@ -147,7 +141,13 @@ def create_payment(*, app: App, user: User) -> Payment:
     )
     payment.full_clean()
     payment.save()
-    logger.info("Payment created: user_id=%s app_id=%s amount=%s %s", user.id, app.id, payment.amount, payment.currency)
+    logger.info(
+        "Payment created: user_id=%s app_id=%s amount=%s %s",
+        user.id,
+        app.id,
+        payment.amount,
+        payment.currency,
+    )
     return payment
 
 
@@ -188,7 +188,9 @@ def install_app(*, app: App, user: User) -> Installation:
             logger.info("App installed: user_id=%s app_id=%s", user.id, app.id)
             return existing
 
-        installation = Installation.objects.create_installation(app=app, user=user, payment=payment)
+        installation = Installation.objects.create_installation(
+            app=app, user=user, payment=payment
+        )
         logger.info("App installed: user_id=%s app_id=%s", user.id, app.id)
         return installation
 
@@ -216,14 +218,20 @@ def create_or_update_review(
         existing.rating = rating
         existing.message = message
         existing.save()
-        logger.info("Review updated: user_id=%s app_id=%s rating=%s", user.id, app.id, rating)
+        logger.info(
+            "Review updated: user_id=%s app_id=%s rating=%s", user.id, app.id, rating
+        )
         return existing
 
     if not Installation.objects.filter(app=app, user=user).exists():
         raise ValidationError("You can only review apps you have installed.")
 
-    review = Review.objects.create_review(app=app, user=user, rating=rating, message=message)
-    logger.info("Review created: user_id=%s app_id=%s rating=%s", user.id, app.id, rating)
+    review = Review.objects.create_review(
+        app=app, user=user, rating=rating, message=message
+    )
+    logger.info(
+        "Review created: user_id=%s app_id=%s rating=%s", user.id, app.id, rating
+    )
     return review
 
 

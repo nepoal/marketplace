@@ -1,12 +1,13 @@
 from django.test import TestCase
 from rest_framework.exceptions import ValidationError
 
-from open_schools_platform.marketplace_management.models import ModeratorProfile
 from open_schools_platform.marketplace_management.services.moderator import (
     create_moderator,
     update_moderator,
 )
-from open_schools_platform.marketplace_management.tests.utils import create_test_moderator
+from open_schools_platform.marketplace_management.tests.utils import (
+    create_test_moderator,
+)
 from open_schools_platform.user_management.users.tests.utils import create_test_user
 
 

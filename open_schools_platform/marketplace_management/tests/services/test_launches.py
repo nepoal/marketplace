@@ -27,7 +27,9 @@ class CreateAppLaunchTests(TestCase):
         self.assertTrue(len(launch.launch_token) > 0)
 
     def test_launch_inactive_app_raises_error(self):
-        pending_app = create_test_app(name="Pending", status=App.Status.PENDING, with_url=True)
+        pending_app = create_test_app(
+            name="Pending", status=App.Status.PENDING, with_url=True
+        )
         Installation.objects.create_installation(app=pending_app, user=self.user)
         with self.assertRaises(ValidationError):
             create_app_launch(app=pending_app, user=self.user)

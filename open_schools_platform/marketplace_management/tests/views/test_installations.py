@@ -12,7 +12,10 @@ from open_schools_platform.marketplace_management.tests.utils import (
     create_test_paid_app,
     create_test_payment,
 )
-from open_schools_platform.user_management.users.tests.utils import create_logged_in_user, create_test_user
+from open_schools_platform.user_management.users.tests.utils import (
+    create_logged_in_user,
+    create_test_user,
+)
 
 NS = "api:marketplace-management:marketplace"
 

@@ -3,7 +3,9 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from open_schools_platform.marketplace_management.models import OidcAuthorizationCode
-from open_schools_platform.marketplace_management.services.oidc import initiate_oidc_auth
+from open_schools_platform.marketplace_management.services.oidc import (
+    initiate_oidc_auth,
+)
 from open_schools_platform.marketplace_management.tests.utils import (
     create_test_app,
     create_test_app_launch,
@@ -100,7 +102,9 @@ class InitiateOidcAuthTests(TestCase):
         other_redirect = "https://other.example.com/callback"
         other_app = create_test_app(name="Other App", with_url=True)
         create_test_installation(app=other_app, user=self.user)
-        create_test_oidc_client_with_secret(app=other_app, redirect_uris=[other_redirect])
+        create_test_oidc_client_with_secret(
+            app=other_app, redirect_uris=[other_redirect]
+        )
         other_launch = create_test_app_launch(app=other_app, user=self.user)
         with self.assertRaises(PermissionDenied):
             self._do_auth(launch_token=other_launch.launch_token)

@@ -5,7 +5,9 @@ from django.core.management.base import CommandError
 from django.test import TestCase
 
 from open_schools_platform.marketplace_management.models import ModeratorProfile
-from open_schools_platform.marketplace_management.tests.utils import create_test_moderator
+from open_schools_platform.marketplace_management.tests.utils import (
+    create_test_moderator,
+)
 from open_schools_platform.user_management.users.tests.utils import create_test_user
 
 

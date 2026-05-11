@@ -39,7 +39,14 @@ class AppListApiTests(TestCase):
         create_test_app(name="Test")
         response = self.client.get(self.url)
         app_data = response.data["results"][0]
-        for field in ("id", "name", "status", "is_free", "categories", "average_rating"):
+        for field in (
+            "id",
+            "name",
+            "status",
+            "is_free",
+            "categories",
+            "average_rating",
+        ):
             self.assertIn(field, app_data)
 
 

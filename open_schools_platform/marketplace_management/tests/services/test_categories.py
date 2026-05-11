@@ -1,6 +1,8 @@
 from django.test import TestCase
 
-from open_schools_platform.marketplace_management.tests.utils import create_test_category
+from open_schools_platform.marketplace_management.tests.utils import (
+    create_test_category,
+)
 
 
 class CreateCategoryTests(TestCase):

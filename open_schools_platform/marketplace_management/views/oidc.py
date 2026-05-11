@@ -9,14 +9,18 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from open_schools_platform.api.swagger_tags import SwaggerTags
-from open_schools_platform.marketplace_management.oidc_server import authorization_server
+from open_schools_platform.marketplace_management.oidc_server import (
+    authorization_server,
+)
 from open_schools_platform.marketplace_management.selectors import get_access_token
 from open_schools_platform.marketplace_management.serializers import (
     OidcTokenResponseSerializer,
     OidcUserInfoSerializer,
 )
 from open_schools_platform.marketplace_management.services import initiate_oidc_auth
-from open_schools_platform.user_management.users.serializers import GetUserProfilesSerializer
+from open_schools_platform.user_management.users.serializers import (
+    GetUserProfilesSerializer,
+)
 
 TAGS = [SwaggerTags.MARKETPLACE_MANAGEMENT]
 logger = logging.getLogger("marketplace_management")
@@ -160,7 +164,9 @@ class OidcUserInfoApi(APIView):
             logger.warning("UserInfo: invalid access_token")
             raise AuthenticationFailed("Invalid access_token.")
         if access_token.is_expired:
-            logger.warning("UserInfo: expired access_token user_id=%s", access_token.user_id)
+            logger.warning(
+                "UserInfo: expired access_token user_id=%s", access_token.user_id
+            )
             raise AuthenticationFailed("access_token has expired.")
 
         user = access_token.user

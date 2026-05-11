@@ -2,7 +2,10 @@ from django.test import TestCase
 from rest_framework.exceptions import ValidationError
 
 from open_schools_platform.marketplace_management.models import App, Installation
-from open_schools_platform.marketplace_management.services.app import install_app, uninstall_app
+from open_schools_platform.marketplace_management.services.app import (
+    install_app,
+    uninstall_app,
+)
 from open_schools_platform.marketplace_management.tests.utils import (
     create_test_app,
     create_test_paid_app,

@@ -20,14 +20,18 @@ class CreateOrUpdateReviewTests(TestCase):
         create_test_installation(app=self.app, user=self.user)
 
     def test_create_new_review(self):
-        review = create_or_update_review(app=self.app, user=self.user, rating=4, message="Great!")
+        review = create_or_update_review(
+            app=self.app, user=self.user, rating=4, message="Great!"
+        )
         self.assertEqual(4, review.rating)
         self.assertEqual("Great!", review.message)
         self.assertEqual(1, Review.objects.count())
 
     def test_update_existing_review(self):
         create_or_update_review(app=self.app, user=self.user, rating=3, message="OK")
-        review = create_or_update_review(app=self.app, user=self.user, rating=5, message="Excellent!")
+        review = create_or_update_review(
+            app=self.app, user=self.user, rating=5, message="Excellent!"
+        )
         self.assertEqual(5, review.rating)
         self.assertEqual("Excellent!", review.message)
         self.assertEqual(1, Review.objects.count())
@@ -44,7 +48,9 @@ class CreateOrUpdateReviewTests(TestCase):
         self.assertEqual(5, review.rating)
 
     def test_review_with_empty_message(self):
-        review = create_or_update_review(app=self.app, user=self.user, rating=3, message="")
+        review = create_or_update_review(
+            app=self.app, user=self.user, rating=3, message=""
+        )
         self.assertEqual("", review.message)
 
 

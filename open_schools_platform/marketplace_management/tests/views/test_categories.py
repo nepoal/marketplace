@@ -2,7 +2,9 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from open_schools_platform.marketplace_management.tests.utils import create_test_category
+from open_schools_platform.marketplace_management.tests.utils import (
+    create_test_category,
+)
 
 NS = "api:marketplace-management:marketplace"
 

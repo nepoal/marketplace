@@ -10,7 +10,10 @@ from open_schools_platform.marketplace_management.tests.utils import (
     create_test_installation,
     create_test_review,
 )
-from open_schools_platform.user_management.users.tests.utils import create_logged_in_user, create_test_user
+from open_schools_platform.user_management.users.tests.utils import (
+    create_logged_in_user,
+    create_test_user,
+)
 
 NS = "api:marketplace-management:marketplace"
 
@@ -65,7 +68,9 @@ class AppReviewCreateUpdateApiTests(TestCase):
         user = create_logged_in_user(instance=self)
         app = create_test_app()
         create_test_installation(app=app, user=user)
-        response = self.client.post(self.url(app.id), {"rating": 5, "message": "Excellent!"})
+        response = self.client.post(
+            self.url(app.id), {"rating": 5, "message": "Excellent!"}
+        )
         self.assertEqual(200, response.status_code)
         self.assertIn("review", response.data)
         self.assertEqual(1, Review.objects.count())
@@ -75,7 +80,9 @@ class AppReviewCreateUpdateApiTests(TestCase):
         app = create_test_app()
         create_test_installation(app=app, user=user)
         self.client.post(self.url(app.id), {"rating": 3, "message": "OK"})
-        response = self.client.post(self.url(app.id), {"rating": 5, "message": "Great!"})
+        response = self.client.post(
+            self.url(app.id), {"rating": 5, "message": "Great!"}
+        )
         self.assertEqual(200, response.status_code)
         self.assertEqual(5, response.data["review"]["rating"])
         self.assertEqual(1, Review.objects.count())
