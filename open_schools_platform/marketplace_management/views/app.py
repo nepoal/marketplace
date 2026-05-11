@@ -36,7 +36,7 @@ from open_schools_platform.marketplace_management.serializers import (
     AppListSerializer,
     AppDetailSerializer,
     ReviewSerializer,
-    CreateReviewSerializer,
+    CreateUpdateReviewSerializer,
     InstallationSerializer,
     PaymentSerializer,
     AppLaunchResponseSerializer,
@@ -228,13 +228,13 @@ class AppReviewListApi(ListAPIView):
 class AppReviewCreateUpdateApi(ApiAuthMixin, APIView):
     @swagger_auto_schema(
         operation_description="Create or update a review for an installed app.",
-        request_body=CreateReviewSerializer,
+        request_body=CreateUpdateReviewSerializer,
         tags=TAGS,
         responses={200: convert_dict_to_serializer({"review": ReviewSerializer()})},
     )
     def post(self, request, app_id):
         app = get_app(filters={"id": str(app_id)}, empty_exception=True)
-        serializer = CreateReviewSerializer(data=request.data)
+        serializer = CreateUpdateReviewSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         review = create_or_update_review(
             app=app,

@@ -7,7 +7,7 @@ from open_schools_platform.marketplace_management.models import ModeratorProfile
 class Command(BaseCommand):
     help = (
         "Grant chief moderator status to a user by phone number.\n"
-        "Usage: python manage.py make_chief_moderator +79123456789\n"
+        "Usage: python manage.py createchiefmoderator +79123456789\n"
         "Use --demote to remove chief moderator status."
     )
 

@@ -3,7 +3,6 @@ from rest_framework import serializers
 from open_schools_platform.marketplace_management.models import (
     App,
     AppVersion,
-    AppUrl,
     Category,
     Installation,
     Review,
@@ -21,12 +20,6 @@ class AppVersionSerializer(serializers.ModelSerializer):
     class Meta:
         model = AppVersion
         fields = ("id", "version", "description", "date")
-
-
-class AppUrlSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = AppUrl
-        fields = ("base_url", "launch_path", "launch_url")
 
 
 class ReviewSerializer(serializers.ModelSerializer):
@@ -94,14 +87,9 @@ class AppDetailSerializer(serializers.ModelSerializer):
         )
 
 
-class CreateReviewSerializer(serializers.Serializer):
+class CreateUpdateReviewSerializer(serializers.Serializer):
     rating = serializers.IntegerField(min_value=1, max_value=5)
     message = serializers.CharField(max_length=2000, allow_blank=True, default="")
-
-
-class UpdateReviewSerializer(serializers.Serializer):
-    rating = serializers.IntegerField(min_value=1, max_value=5, required=False)
-    message = serializers.CharField(max_length=2000, allow_blank=True, required=False)
 
 
 class PaymentSerializer(serializers.ModelSerializer):

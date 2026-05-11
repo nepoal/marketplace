@@ -157,6 +157,7 @@ class AppLaunch(BaseModel):
     )
     launch_token = models.CharField(max_length=256, unique=True)
     token_exp = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
 
     objects = AppLaunchManager()
 

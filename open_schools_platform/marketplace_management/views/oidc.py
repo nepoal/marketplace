@@ -1,3 +1,5 @@
+import logging
+
 from django.http import HttpResponse
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -17,6 +19,7 @@ from open_schools_platform.marketplace_management.services import initiate_oidc_
 from open_schools_platform.user_management.users.serializers import GetUserProfilesSerializer
 
 TAGS = [SwaggerTags.MARKETPLACE_MANAGEMENT]
+logger = logging.getLogger("marketplace_management")
 
 
 class OidcAuthApi(APIView):
@@ -111,6 +114,12 @@ class OidcTokenApi(APIView):
             data = json.loads(http_response.content)
         except (TypeError, ValueError):
             data = {"error": http_response.content.decode("utf-8", errors="replace")}
+        if http_response.status_code != 200:
+            logger.warning(
+                "Token request failed: status=%s error=%s",
+                http_response.status_code,
+                data.get("error"),
+            )
         return Response(data, status=http_response.status_code)
 
 
@@ -139,6 +148,7 @@ class OidcUserInfoApi(APIView):
 
         auth_header = request.headers.get("Authorization", "")
         if not auth_header.startswith("Bearer "):
+            logger.warning("UserInfo: missing or invalid Bearer header")
             raise AuthenticationFailed(
                 "Authorization header must be 'Bearer <access_token>'."
             )
@@ -147,8 +157,10 @@ class OidcUserInfoApi(APIView):
         access_token = get_access_token(filters={"token": token_value})
 
         if not access_token:
+            logger.warning("UserInfo: invalid access_token")
             raise AuthenticationFailed("Invalid access_token.")
         if access_token.is_expired:
+            logger.warning("UserInfo: expired access_token user_id=%s", access_token.user_id)
             raise AuthenticationFailed("access_token has expired.")
 
         user = access_token.user

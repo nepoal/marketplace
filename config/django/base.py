@@ -229,6 +229,7 @@ from config.settings.sentry import *  # noqa
 from config.settings.geo_django import *  # noqa
 from config.settings.file_storages import *  # noqa
 from config.settings.email import *  # noqa
+from config.settings.logging import *  # noqa
 
 ADMIN_PANEL_ENABLED = env.bool('ADMIN_PANEL_ENABLED', default=True)
 

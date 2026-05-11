@@ -8,7 +8,6 @@ from django.db import transaction
 from django.utils import timezone
 
 from open_schools_platform.marketplace_management.constants import (
-    AUTH_CODE_TTL,
     ACCESS_TOKEN_TTL,
     REFRESH_TOKEN_TTL,
 )
@@ -52,21 +51,6 @@ class AuthorizationCodeGrant(grants.AuthorizationCodeGrant):
     """Authorization Code grant that stores codes in the DB and appends id_token to the response."""
 
     TOKEN_ENDPOINT_AUTH_METHODS = ["client_secret_basic", "client_secret_post"]
-
-    def save_authorization_code(self, code: str, request):
-        from open_schools_platform.marketplace_management.models import (
-            OidcAuthorizationCode,
-        )
-
-        OidcAuthorizationCode.objects.create(
-            code=code,
-            client=request.client,
-            user=request.user,
-            redirect_uri=request.redirect_uri,
-            scope=request.scope,
-            nonce=request.data.get("nonce", ""),
-            expires_at=timezone.now() + timezone.timedelta(seconds=AUTH_CODE_TTL),
-        )
 
     def query_authorization_code(self, code: str, client):
         from open_schools_platform.marketplace_management.models import (

@@ -1,9 +1,12 @@
+import logging
 import secrets
 from typing import Tuple
 
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError, PermissionDenied
+
+logger = logging.getLogger("marketplace_management")
 
 from open_schools_platform.common.services import model_update
 from open_schools_platform.marketplace_management.constants import (
@@ -78,7 +81,7 @@ def create_app_version(*, app: App, version: str, description: str = "") -> AppV
 
 
 def create_app_url(
-    *, app: App, base_url: str, launch_path: str = "/", health_check_path: str = ""
+    *, app: App, base_url: str, launch_path: str = "/"
 ) -> AppUrl:
     if hasattr(app, "url_config"):
         raise ValidationError("This app already has a URL configuration.")
@@ -86,14 +89,13 @@ def create_app_url(
         app=app,
         base_url=base_url,
         launch_path=launch_path,
-        health_check_path=health_check_path,
     )
 
 
 def update_app_url(*, app_url: AppUrl, data: dict) -> AppUrl:
     app_url, _ = model_update(
         instance=app_url,
-        fields=["base_url", "launch_path", "health_check_path"],
+        fields=["base_url", "launch_path"],
         data=data,
     )
     return app_url
@@ -104,9 +106,11 @@ def create_app_launch(*, app: App, user: User) -> AppLaunch:
         raise ValidationError("Cannot launch an app that is not active.")
     if not Installation.objects.filter(app=app, user=user, active=True).exists():
         raise ValidationError("User has not installed this app.")
-    return AppLaunch.objects.create_launch(
+    launch = AppLaunch.objects.create_launch(
         app=app, user=user, ttl_seconds=LAUNCH_TOKEN_TTL
     )
+    logger.info("App launched: user_id=%s app_id=%s", user.id, app.id)
+    return launch
 
 
 def build_launch_url(*, app_launch: AppLaunch) -> str:
@@ -143,6 +147,7 @@ def create_payment(*, app: App, user: User) -> Payment:
     )
     payment.full_clean()
     payment.save()
+    logger.info("Payment created: user_id=%s app_id=%s amount=%s %s", user.id, app.id, payment.amount, payment.currency)
     return payment
 
 
@@ -173,15 +178,19 @@ def install_app(*, app: App, user: User) -> Installation:
                 existing.active = True
                 existing.payment = payment
                 existing.save()
+                logger.info("App installed: user_id=%s app_id=%s", user.id, app.id)
                 return existing
             if existing.active:
                 raise ValidationError("App is already installed.")
             existing.active = True
             existing.payment = payment
             existing.save(update_fields=["active", "payment"])
+            logger.info("App installed: user_id=%s app_id=%s", user.id, app.id)
             return existing
 
-        return Installation.objects.create_installation(app=app, user=user, payment=payment)
+        installation = Installation.objects.create_installation(app=app, user=user, payment=payment)
+        logger.info("App installed: user_id=%s app_id=%s", user.id, app.id)
+        return installation
 
 
 def uninstall_app(*, app: App, user: User) -> None:
@@ -190,6 +199,7 @@ def uninstall_app(*, app: App, user: User) -> None:
         raise ValidationError("App is not installed.")
     installation.active = False
     installation.save(update_fields=["active"])
+    logger.info("App uninstalled: user_id=%s app_id=%s", user.id, app.id)
 
 
 def create_or_update_review(
@@ -206,17 +216,19 @@ def create_or_update_review(
         existing.rating = rating
         existing.message = message
         existing.save()
+        logger.info("Review updated: user_id=%s app_id=%s rating=%s", user.id, app.id, rating)
         return existing
 
     if not Installation.objects.filter(app=app, user=user).exists():
         raise ValidationError("You can only review apps you have installed.")
 
-    return Review.objects.create_review(
-        app=app, user=user, rating=rating, message=message
-    )
+    review = Review.objects.create_review(app=app, user=user, rating=rating, message=message)
+    logger.info("Review created: user_id=%s app_id=%s rating=%s", user.id, app.id, rating)
+    return review
 
 
 def delete_review(*, review: Review, user: User) -> None:
     if review.user_id != user.id:
         raise PermissionDenied("You can only delete your own reviews.")
     review.delete()
+    logger.info("Review deleted: user_id=%s app_id=%s", review.user_id, review.app_id)

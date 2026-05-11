@@ -1,8 +1,11 @@
+import logging
 import secrets
 from typing import Tuple
 
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError, PermissionDenied
+
+logger = logging.getLogger("marketplace_management")
 
 from open_schools_platform.marketplace_management.constants import AUTH_CODE_TTL
 from open_schools_platform.marketplace_management.models import (
@@ -61,7 +64,13 @@ def initiate_oidc_auth(
     )
 
     if not client.check_redirect_uri(redirect_uri):
+        logger.warning("Invalid redirect_uri: client_id=%s uri=%s", client_id, redirect_uri)
         raise PermissionDenied("redirect_uri is not registered for this client.")
+
+    if not client.check_response_type(response_type):
+        raise ValidationError(
+            f"Unsupported response_type: '{response_type}'. Expected 'code id_token'."
+        )
 
     if "openid" not in scope.split():
         raise ValidationError("scope must include 'openid'.")
@@ -73,9 +82,19 @@ def initiate_oidc_auth(
     )
 
     if launch.is_expired:
+        logger.warning("Expired launch_token: client_id=%s", client_id)
         raise ValidationError("launch_token has expired.")
 
+    if launch.is_used:
+        logger.warning("Reused launch_token: client_id=%s", client_id)
+        raise ValidationError("launch_token has already been used.")
+
     if launch.app.oidc_client.client_id != client_id:
+        logger.warning(
+            "launch_token client mismatch: expected=%s got=%s",
+            client_id,
+            launch.app.oidc_client.client_id,
+        )
         raise PermissionDenied("launch_token does not belong to this client.")
 
     user = launch.user
@@ -91,7 +110,11 @@ def initiate_oidc_auth(
         expires_at=timezone.now() + timezone.timedelta(seconds=AUTH_CODE_TTL),
     )
 
+    launch.is_used = True
+    launch.save(update_fields=["is_used"])
+
     id_token = generate_id_token(user=user, client=client, nonce=nonce)
 
+    logger.info("Auth code issued: client_id=%s user_id=%s", client_id, user.id)
     fragment = f"code={code}&id_token={id_token}"
     return f"{redirect_uri}#{fragment}", code, id_token
