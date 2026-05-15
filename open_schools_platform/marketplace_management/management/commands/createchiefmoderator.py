@@ -54,10 +54,12 @@ class Command(BaseCommand):
                 self.style.SUCCESS(f"Moderator profile removed from {user} ({phone}).")
             )
         else:
-            profile, created = ModeratorProfile.objects.get_or_create(user=user)
-            profile.is_chief = True
-            profile.save(update_fields=["is_chief"])
-            action = "created and granted" if created else "updated — granted"
+            already_exists = ModeratorProfile.objects.filter(user=user).exists()
+            ModeratorProfile.objects.update_or_create_with_check(
+                defaults={"is_chief": True},
+                user=user,
+            )
+            action = "updated — granted" if already_exists else "created and granted"
             self.stdout.write(
                 self.style.SUCCESS(
                     f"Moderator profile {action} chief moderator status for {user} ({phone})."
