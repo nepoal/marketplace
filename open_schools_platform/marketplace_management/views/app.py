@@ -1,7 +1,6 @@
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.exceptions import NotFound
 from rest_framework.generics import ListAPIView
-from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -55,8 +54,7 @@ from open_schools_platform.marketplace_management.services import (
 TAGS = [SwaggerTags.MARKETPLACE_MANAGEMENT]
 
 
-class CategoryListApi(APIView):
-    permission_classes = (AllowAny,)
+class CategoryListApi(ApiAuthMixin, APIView):
 
     @swagger_auto_schema(
         operation_description="Get all app categories",
@@ -72,8 +70,7 @@ class CategoryListApi(APIView):
         return Response({"categories": CategorySerializer(categories, many=True).data})
 
 
-class AppListApi(ListAPIView):
-    permission_classes = (AllowAny,)
+class AppListApi(ApiAuthMixin, ListAPIView):
     queryset = App.objects.all()
     filterset_class = AppFilter
     pagination_class = AppListPagination
@@ -96,8 +93,7 @@ class AppListApi(ListAPIView):
         )
 
 
-class AppDetailApi(APIView):
-    permission_classes = (AllowAny,)
+class AppDetailApi(ApiAuthMixin, APIView):
 
     @swagger_auto_schema(
         operation_description="Get detailed information about an app.",
@@ -203,8 +199,7 @@ class UserInstallationListApi(ApiAuthMixin, ListAPIView):
         )
 
 
-class AppReviewListApi(ListAPIView):
-    permission_classes = (AllowAny,)
+class AppReviewListApi(ApiAuthMixin, ListAPIView):
     queryset = Review.objects.all()
     filterset_class = ReviewFilter
     pagination_class = ReviewListPagination
