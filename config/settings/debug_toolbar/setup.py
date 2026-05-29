@@ -22,6 +22,12 @@ def show_toolbar(*args, **kwargs) -> bool:
 
     Additionally, we don't want to deal with the INTERNAL_IPS thing.
     """
+    from django.conf import settings as django_settings
+
+    # Allow Django settings to override the env-based flag (e.g. in test.py).
+    if not getattr(django_settings, "DEBUG_TOOLBAR_ENABLED", True):
+        return False
+
     from .settings import DEBUG_TOOLBAR_ENABLED
 
     if not DEBUG_TOOLBAR_ENABLED:

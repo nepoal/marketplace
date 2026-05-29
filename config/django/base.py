@@ -51,7 +51,8 @@ LOCAL_APPS = [
     'open_schools_platform.ticket_management.tickets.apps.TicketsConfig',
     'open_schools_platform.organization_management.teachers.apps.TeachersConfig',
     'open_schools_platform.testing.apps.TestingConfig',
-    'open_schools_platform.sms.apps.SmsConfig'
+    'open_schools_platform.sms.apps.SmsConfig',
+    'open_schools_platform.marketplace_management.apps.MarketplaceManagementConfig',
 ]
 
 THIRD_PARTY_APPS = [
@@ -228,6 +229,7 @@ from config.settings.sentry import *  # noqa
 from config.settings.geo_django import *  # noqa
 from config.settings.file_storages import *  # noqa
 from config.settings.email import *  # noqa
+from config.settings.logging import *  # noqa
 
 ADMIN_PANEL_ENABLED = env.bool('ADMIN_PANEL_ENABLED', default=True)
 

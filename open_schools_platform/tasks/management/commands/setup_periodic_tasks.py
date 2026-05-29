@@ -5,6 +5,8 @@ from django.utils.timezone import get_default_timezone_name
 from django_celery_beat.models import IntervalSchedule, CrontabSchedule, PeriodicTask
 
 
+
+
 class Command(BaseCommand):
     help = """
     Setup celery beat periodic tasks.

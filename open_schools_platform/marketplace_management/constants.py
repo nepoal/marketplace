@@ -1,0 +1,4 @@
+AUTH_CODE_TTL = 300  # 5 minutes
+ACCESS_TOKEN_TTL = 3600  # 1 hour
+REFRESH_TOKEN_TTL = 2592000  # 30 days
+LAUNCH_TOKEN_TTL = 300  # 5 minutes
